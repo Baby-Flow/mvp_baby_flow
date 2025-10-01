@@ -7,7 +7,8 @@ import pytz
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import Message, FSInputFile
+from chart_generator import create_sleep_chart, create_feeding_chart, create_activity_summary_chart
 
 load_dotenv()
 
@@ -299,6 +300,196 @@ async def today_handler(message: Message):
         await message.answer("Что-то пошло не так 😔")
 
 
+@dp.message(Command("stats"))
+async def stats_handler(message: Message):
+    """Показать статистику за неделю"""
+    telegram_id = message.from_user.id
+
+    if telegram_id not in user_mapping:
+        await message.answer("Сначала добавьте малыша через /add_child")
+        return
+
+    child_id = user_mapping[telegram_id]["child_id"]
+
+    try:
+        response = requests.get(f"{ACTIVITY_SERVICE_URL}/analytics/child/{child_id}/stats?days=7")
+        if response.status_code != 200:
+            await message.answer("Не могу получить статистику, попробуйте позже 🙏")
+            return
+
+        data = response.json()
+        text = "📊 *Статистика за неделю:*\n\n"
+
+        # Сон
+        sleep = data["sleep"]
+        text += f"😴 *Сон:*\n"
+        text += f"• Всего: {sleep['count']} раз\n"
+        text += f"• Средняя длительность: {sleep['avg_duration_hours']} ч\n"
+        text += f"• Общее время: {sleep['total_duration_hours']} ч\n\n"
+
+        # Кормление
+        feeding = data["feeding"]
+        text += f"🍼 *Кормление:*\n"
+        text += f"• Всего: {feeding['count']} раз\n"
+        if feeding['avg_amount_ml'] > 0:
+            text += f"• Средний объем: {int(feeding['avg_amount_ml'])} мл\n"
+            text += f"• Общий объем: {int(feeding['total_amount_ml'])} мл\n"
+        if feeding['by_type']:
+            text += "• По типам:\n"
+            for ftype, count in feeding['by_type'].items():
+                text += f"  - {ftype}: {count}\n"
+        text += "\n"
+
+        # Прогулки
+        walks = data["walks"]
+        if walks['count'] > 0:
+            text += f"🚶 *Прогулки:*\n"
+            text += f"• Всего: {walks['count']} раз\n"
+            text += f"• Средняя длительность: {walks['avg_duration_hours']} ч\n\n"
+
+        # Подгузники
+        diapers = data["diapers"]
+        if diapers['count'] > 0:
+            text += f"🚼 *Подгузники:*\n"
+            text += f"• Всего: {diapers['count']} раз\n"
+            if diapers['by_type']:
+                for dtype, count in diapers['by_type'].items():
+                    emoji = "💩" if dtype == "poop" else "💧" if dtype == "pee" else "🚼"
+                    text += f"• {emoji} {dtype}: {count}\n"
+            text += "\n"
+
+        # Температура
+        temp = data["temperature"]
+        if temp['count'] > 0:
+            text += f"🌡️ *Температура:*\n"
+            text += f"• Измерений: {temp['count']}\n"
+            text += f"• Средняя: {temp['avg']:.1f}°C\n"
+            text += f"• Минимум: {temp['min']:.1f}°C\n"
+            text += f"• Максимум: {temp['max']:.1f}°C\n"
+
+        await message.answer(text, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"Error in stats_handler: {e}")
+        await message.answer("Что-то пошло не так 😔")
+
+
+@dp.message(Command("week"))
+async def week_handler(message: Message):
+    """Показать активности за неделю"""
+    telegram_id = message.from_user.id
+
+    if telegram_id not in user_mapping:
+        await message.answer("Сначала добавьте малыша через /add_child")
+        return
+
+    child_id = user_mapping[telegram_id]["child_id"]
+
+    try:
+        response = requests.get(f"{ACTIVITY_SERVICE_URL}/analytics/child/{child_id}/daily?days=7")
+        if response.status_code != 200:
+            await message.answer("Не могу получить данные, попробуйте позже 🙏")
+            return
+
+        daily_data = response.json()
+        text = "📅 *Активности за неделю:*\n\n"
+
+        for day in daily_data:
+            from datetime import datetime
+            date_obj = datetime.fromisoformat(day['date'])
+            day_name = date_obj.strftime("%d.%m (%a)")
+
+            text += f"*{day_name}:*\n"
+            text += f"  😴 Сон: {day['sleep']['total_hours']}ч ({day['sleep']['count']} раз)\n"
+            text += f"  🍼 Кормлений: {day['feeding']['count']}"
+            if day['feeding']['total_ml']:
+                text += f" ({day['feeding']['total_ml']}мл)"
+            text += f"\n"
+            text += f"  🚼 Подгузников: {day['diapers']['count']}\n\n"
+
+        await message.answer(text, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"Error in week_handler: {e}")
+        await message.answer("Что-то пошло не так 😔")
+
+
+@dp.message(Command("chart"))
+async def chart_handler(message: Message):
+    """Отправить графики статистики"""
+    telegram_id = message.from_user.id
+
+    if telegram_id not in user_mapping:
+        await message.answer("Сначала добавьте малыша через /add_child")
+        return
+
+    child_id = user_mapping[telegram_id]["child_id"]
+
+    try:
+        # Получаем данные
+        stats_response = requests.get(f"{ACTIVITY_SERVICE_URL}/analytics/child/{child_id}/stats?days=7")
+        daily_response = requests.get(f"{ACTIVITY_SERVICE_URL}/analytics/child/{child_id}/daily?days=7")
+
+        if stats_response.status_code != 200 or daily_response.status_code != 200:
+            await message.answer("Не могу получить данные для графиков 😔")
+            return
+
+        stats_data = stats_response.json()
+        daily_data = daily_response.json()
+
+        await message.answer("📈 Генерирую графики статистики...")
+
+        # Создаем графики
+        import tempfile
+        import os
+
+        # График сна
+        sleep_chart = create_sleep_chart(daily_data)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            tmp_file.write(sleep_chart)
+            sleep_chart_path = tmp_file.name
+
+        # График кормлений
+        feeding_chart = create_feeding_chart(daily_data)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            tmp_file.write(feeding_chart)
+            feeding_chart_path = tmp_file.name
+
+        # Сводная статистика
+        summary_chart = create_activity_summary_chart(stats_data)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            tmp_file.write(summary_chart)
+            summary_chart_path = tmp_file.name
+
+        # Отправляем графики
+        await bot.send_photo(
+            message.chat.id,
+            FSInputFile(sleep_chart_path),
+            caption="😴 График сна за неделю"
+        )
+
+        await bot.send_photo(
+            message.chat.id,
+            FSInputFile(feeding_chart_path),
+            caption="🍼 График кормлений за неделю"
+        )
+
+        await bot.send_photo(
+            message.chat.id,
+            FSInputFile(summary_chart_path),
+            caption="📊 Сводная статистика за неделю"
+        )
+
+        # Удаляем временные файлы
+        os.unlink(sleep_chart_path)
+        os.unlink(feeding_chart_path)
+        os.unlink(summary_chart_path)
+
+    except Exception as e:
+        logger.error(f"Error in chart_handler: {e}")
+        await message.answer("Не удалось создать графики 😔")
+
+
 @dp.message(Command("help"))
 async def help_handler(message: Message):
     """Помощь"""
@@ -309,6 +500,9 @@ async def help_handler(message: Message):
 /start - начать работу
 /add_child - добавить малыша
 /today - что было сегодня
+/stats - статистика за неделю
+/week - активности за неделю
+/chart - графики статистики
 /help - эта справка
 
 *Просто пишите что происходит:*

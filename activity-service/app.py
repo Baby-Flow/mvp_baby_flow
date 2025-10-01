@@ -373,3 +373,186 @@ def get_today_activities(child_id: int, db: Session = Depends(get_db)):
         "medications": medications,
         "moods": moods
     }
+
+
+# Analytics endpoints
+@app.get("/analytics/child/{child_id}/stats")
+def get_child_stats(child_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """Получить статистику за период"""
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    end_date = datetime.now(moscow_tz)
+    start_date = end_date - timedelta(days=days)
+
+    # Статистика сна
+    sleep_stats = db.query(
+        func.count(SleepActivity.id).label('count'),
+        func.avg(SleepActivity.duration_minutes).label('avg_duration'),
+        func.sum(SleepActivity.duration_minutes).label('total_duration')
+    ).filter(
+        SleepActivity.child_id == child_id,
+        SleepActivity.start_time >= start_date,
+        SleepActivity.duration_minutes.isnot(None)
+    ).first()
+
+    # Статистика кормлений
+    feeding_stats = db.query(
+        func.count(FeedingActivity.id).label('count'),
+        func.avg(FeedingActivity.amount_ml).label('avg_amount'),
+        func.sum(FeedingActivity.amount_ml).label('total_amount')
+    ).filter(
+        FeedingActivity.child_id == child_id,
+        FeedingActivity.time >= start_date
+    ).first()
+
+    # Подсчет по типам кормления
+    feeding_by_type = db.query(
+        FeedingActivity.type,
+        func.count(FeedingActivity.id).label('count')
+    ).filter(
+        FeedingActivity.child_id == child_id,
+        FeedingActivity.time >= start_date
+    ).group_by(FeedingActivity.type).all()
+
+    # Статистика прогулок
+    walk_stats = db.query(
+        func.count(WalkActivity.id).label('count'),
+        func.avg(WalkActivity.duration_minutes).label('avg_duration'),
+        func.sum(WalkActivity.duration_minutes).label('total_duration')
+    ).filter(
+        WalkActivity.child_id == child_id,
+        WalkActivity.start_time >= start_date,
+        WalkActivity.duration_minutes.isnot(None)
+    ).first()
+
+    # Статистика подгузников
+    diaper_stats = db.query(
+        func.count(DiaperActivity.id).label('count')
+    ).filter(
+        DiaperActivity.child_id == child_id,
+        DiaperActivity.time >= start_date
+    ).first()
+
+    # Подсчет по типам подгузников
+    diaper_by_type = db.query(
+        DiaperActivity.type,
+        func.count(DiaperActivity.id).label('count')
+    ).filter(
+        DiaperActivity.child_id == child_id,
+        DiaperActivity.time >= start_date
+    ).group_by(DiaperActivity.type).all()
+
+    # Статистика температуры
+    temp_stats = db.query(
+        func.count(TemperatureActivity.id).label('count'),
+        func.avg(TemperatureActivity.temperature).label('avg_temp'),
+        func.max(TemperatureActivity.temperature).label('max_temp'),
+        func.min(TemperatureActivity.temperature).label('min_temp')
+    ).filter(
+        TemperatureActivity.child_id == child_id,
+        TemperatureActivity.time >= start_date
+    ).first()
+
+    return {
+        "period_days": days,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "sleep": {
+            "count": sleep_stats.count or 0,
+            "avg_duration_minutes": float(sleep_stats.avg_duration) if sleep_stats.avg_duration else 0,
+            "total_duration_minutes": sleep_stats.total_duration or 0,
+            "avg_duration_hours": round(float(sleep_stats.avg_duration) / 60, 1) if sleep_stats.avg_duration else 0,
+            "total_duration_hours": round(float(sleep_stats.total_duration or 0) / 60, 1)
+        },
+        "feeding": {
+            "count": feeding_stats.count or 0,
+            "avg_amount_ml": float(feeding_stats.avg_amount) if feeding_stats.avg_amount else 0,
+            "total_amount_ml": feeding_stats.total_amount or 0,
+            "by_type": {item.type: item.count for item in feeding_by_type}
+        },
+        "walks": {
+            "count": walk_stats.count or 0,
+            "avg_duration_minutes": float(walk_stats.avg_duration) if walk_stats.avg_duration else 0,
+            "total_duration_minutes": walk_stats.total_duration or 0,
+            "avg_duration_hours": round(float(walk_stats.avg_duration) / 60, 1) if walk_stats.avg_duration else 0
+        },
+        "diapers": {
+            "count": diaper_stats.count or 0,
+            "by_type": {item.type: item.count for item in diaper_by_type}
+        },
+        "temperature": {
+            "count": temp_stats.count or 0,
+            "avg": float(temp_stats.avg_temp) if temp_stats.avg_temp else 0,
+            "max": float(temp_stats.max_temp) if temp_stats.max_temp else 0,
+            "min": float(temp_stats.min_temp) if temp_stats.min_temp else 0
+        }
+    }
+
+
+@app.get("/analytics/child/{child_id}/daily")
+def get_daily_stats(child_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """Получить ежедневную статистику для графиков"""
+    from datetime import timedelta, date
+    from sqlalchemy import func, cast, Date
+
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    end_date = datetime.now(moscow_tz).date()
+    start_date = end_date - timedelta(days=days - 1)
+
+    # Статистика сна по дням
+    sleep_by_day = db.query(
+        cast(SleepActivity.start_time, Date).label('date'),
+        func.count(SleepActivity.id).label('count'),
+        func.sum(SleepActivity.duration_minutes).label('total_minutes')
+    ).filter(
+        SleepActivity.child_id == child_id,
+        cast(SleepActivity.start_time, Date) >= start_date,
+        SleepActivity.duration_minutes.isnot(None)
+    ).group_by(cast(SleepActivity.start_time, Date)).all()
+
+    # Кормления по дням
+    feeding_by_day = db.query(
+        cast(FeedingActivity.time, Date).label('date'),
+        func.count(FeedingActivity.id).label('count'),
+        func.sum(FeedingActivity.amount_ml).label('total_ml')
+    ).filter(
+        FeedingActivity.child_id == child_id,
+        cast(FeedingActivity.time, Date) >= start_date
+    ).group_by(cast(FeedingActivity.time, Date)).all()
+
+    # Подгузники по дням
+    diaper_by_day = db.query(
+        cast(DiaperActivity.time, Date).label('date'),
+        func.count(DiaperActivity.id).label('count')
+    ).filter(
+        DiaperActivity.child_id == child_id,
+        cast(DiaperActivity.time, Date) >= start_date
+    ).group_by(cast(DiaperActivity.time, Date)).all()
+
+    # Формируем результат для каждого дня
+    result = []
+    current_date = start_date
+    while current_date <= end_date:
+        sleep_data = next((s for s in sleep_by_day if s.date == current_date), None)
+        feeding_data = next((f for f in feeding_by_day if f.date == current_date), None)
+        diaper_data = next((d for d in diaper_by_day if d.date == current_date), None)
+
+        result.append({
+            "date": current_date.isoformat(),
+            "sleep": {
+                "count": sleep_data.count if sleep_data else 0,
+                "total_hours": round(float(sleep_data.total_minutes or 0) / 60, 1) if sleep_data else 0
+            },
+            "feeding": {
+                "count": feeding_data.count if feeding_data else 0,
+                "total_ml": feeding_data.total_ml if feeding_data else 0
+            },
+            "diapers": {
+                "count": diaper_data.count if diaper_data else 0
+            }
+        })
+        current_date += timedelta(days=1)
+
+    return result
