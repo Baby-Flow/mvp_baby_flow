@@ -55,7 +55,9 @@ async def start_handler(message: Message):
                 "• уснул\n"
                 "• проснулся\n"
                 "• покормила 200мл\n"
-                "• гуляем в парке\n\n"
+                "• гуляем в парке\n"
+                "• вчера вечером плохо спал\n"
+                "• температура была 37.5 позавчера\n\n"
                 "Сначала добавьте малыша командой:\n"
                 "/add_child Имя 2024-01-15"
             )
@@ -146,226 +148,155 @@ async def today_handler(message: Message):
 
     try:
         response = requests.get(f"{ACTIVITY_SERVICE_URL}/activities/child/{child_id}/today")
-        if response.status_code == 200:
-            data = response.json()
-
-            text = "📊 *Сегодня у малыша:*\n\n"
-
-            # Сон
-            if data.get("sleep"):
-                text += "😴 *Сон:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for sleep in data["sleep"]:
-                    # Парсим время и конвертируем в московское
-                    start_dt = datetime.fromisoformat(sleep["start_time"].replace('Z', '+00:00'))
-                    start_moscow = start_dt.astimezone(moscow_tz)
-                    start = start_moscow.strftime("%H:%M")
-
-                    if sleep["end_time"]:
-                        end_dt = datetime.fromisoformat(sleep["end_time"].replace('Z', '+00:00'))
-                        end_moscow = end_dt.astimezone(moscow_tz)
-                        end = end_moscow.strftime("%H:%M")
-                        duration = sleep.get("duration_minutes", 0)
-                        hours = duration // 60
-                        minutes = duration % 60
-                        if hours > 0:
-                            duration_str = f"{hours}ч {minutes}мин"
-                        else:
-                            duration_str = f"{minutes} мин"
-                        text += f"• {start} - {end} ({duration_str})\n"
-                    else:
-                        text += f"• Спит с {start} 💤\n"
-
-            # Кормление
-            if data.get("feeding"):
-                text += "\n🍼 *Кормления:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for feed in data["feeding"]:
-                    time_dt = datetime.fromisoformat(feed["time"].replace('Z', '+00:00'))
-                    time_moscow = time_dt.astimezone(moscow_tz)
-                    time = time_moscow.strftime("%H:%M")
-                    text += f"• {time}"
-                    if feed.get("amount_ml"):
-                        text += f" - {feed['amount_ml']}мл"
-                    if feed.get("food_name"):
-                        text += f" ({feed['food_name']})"
-                    text += "\n"
-
-            # Прогулки
-            if data.get("walks"):
-                text += "\n🚶 *Прогулки:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for walk in data["walks"]:
-                    start_dt = datetime.fromisoformat(walk["start_time"].replace('Z', '+00:00'))
-                    start_moscow = start_dt.astimezone(moscow_tz)
-                    start = start_moscow.strftime("%H:%M")
-                    if walk["end_time"]:
-                        end_dt = datetime.fromisoformat(walk["end_time"].replace('Z', '+00:00'))
-                        end_moscow = end_dt.astimezone(moscow_tz)
-                        end = end_moscow.strftime("%H:%M")
-                        text += f"• {start} - {end}"
-                        if walk.get("location"):
-                            text += f" ({walk['location']})"
-                    else:
-                        text += f"• Гуляем с {start} 🌳"
-                    text += "\n"
-
-            # Подгузники
-            if data.get("diapers"):
-                text += "\n🚼 *Подгузники:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for diaper in data["diapers"]:
-                    time_dt = datetime.fromisoformat(diaper["time"].replace('Z', '+00:00'))
-                    time_moscow = time_dt.astimezone(moscow_tz)
-                    time = time_moscow.strftime("%H:%M")
-
-                    if diaper["type"] == "poop":
-                        emoji = "💩"
-                    elif diaper["type"] == "pee":
-                        emoji = "💧"
-                    else:
-                        emoji = "🚼"
-
-                    text += f"• {time} {emoji}"
-                    if diaper.get("consistency"):
-                        text += f" ({diaper['consistency']})"
-                    text += "\n"
-
-            # Температура
-            if data.get("temperatures"):
-                text += "\n🌡️ *Температура:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for temp in data["temperatures"]:
-                    time_dt = datetime.fromisoformat(temp["time"].replace('Z', '+00:00'))
-                    time_moscow = time_dt.astimezone(moscow_tz)
-                    time = time_moscow.strftime("%H:%M")
-
-                    text += f"• {time} - {temp['temperature']}°C"
-                    if temp.get("measurement_type"):
-                        text += f" ({temp['measurement_type']})"
-                    text += "\n"
-
-            # Лекарства
-            if data.get("medications"):
-                text += "\n💊 *Лекарства:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for med in data["medications"]:
-                    time_dt = datetime.fromisoformat(med["time"].replace('Z', '+00:00'))
-                    time_moscow = time_dt.astimezone(moscow_tz)
-                    time = time_moscow.strftime("%H:%M")
-
-                    text += f"• {time} - {med['medication_name']}"
-                    if med.get("dosage"):
-                        text += f" ({med['dosage']})"
-                    text += "\n"
-
-            # Настроение
-            if data.get("moods"):
-                text += "\n😊 *Настроение:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                mood_emojis = {
-                    "веселое": "😄",
-                    "спокойное": "😌",
-                    "капризное": "😤",
-                    "плачет": "😢",
-                    "хорошее": "😊",
-                    "плохое": "😔"
-                }
-                for mood_entry in data["moods"]:
-                    time_dt = datetime.fromisoformat(mood_entry["time"].replace('Z', '+00:00'))
-                    time_moscow = time_dt.astimezone(moscow_tz)
-                    time = time_moscow.strftime("%H:%M")
-
-                    mood = mood_entry["mood"]
-                    emoji = mood_emojis.get(mood.lower(), "😊")
-                    text += f"• {time} - {emoji} {mood}"
-                    if mood_entry.get("notes"):
-                        text += f" ({mood_entry['notes']})"
-                    text += "\n"
-
-            if not any([data.get("sleep"), data.get("feeding"), data.get("walks"),
-                        data.get("diapers"), data.get("temperatures"),
-                        data.get("medications"), data.get("moods")]):
-                text = "Пока нет записей за сегодня. Расскажите, что делает малыш? 😊"
-
-            await message.answer(text, parse_mode="Markdown")
-        else:
+        if response.status_code != 200:
             await message.answer("Не могу получить данные, попробуйте позже 🙏")
+            return
+
+        data = response.json()
+        text = "📊 *Сегодня у малыша:*\n\n"
+
+        # Сон
+        if data.get("sleep"):
+            text += "😴 *Сон:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for sleep in data["sleep"]:
+                start_dt = datetime.fromisoformat(sleep["start_time"].replace('Z', '+00:00'))
+                start_moscow = start_dt.astimezone(moscow_tz)
+                start = start_moscow.strftime("%H:%M")
+
+                if sleep["end_time"]:
+                    end_dt = datetime.fromisoformat(sleep["end_time"].replace('Z', '+00:00'))
+                    end_moscow = end_dt.astimezone(moscow_tz)
+                    end = end_moscow.strftime("%H:%M")
+                    duration = sleep.get("duration_minutes", 0)
+                    hours = duration // 60
+                    minutes = duration % 60
+                    if hours > 0:
+                        duration_str = f"{hours}ч {minutes}мин"
+                    else:
+                        duration_str = f"{minutes} мин"
+                    text += f"• {start} - {end} ({duration_str})\n"
+                else:
+                    text += f"• Спит с {start} 💤\n"
+
+        # Кормление
+        if data.get("feeding"):
+            text += "\n🍼 *Кормления:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for feed in data["feeding"]:
+                time_dt = datetime.fromisoformat(feed["time"].replace('Z', '+00:00'))
+                time_moscow = time_dt.astimezone(moscow_tz)
+                time = time_moscow.strftime("%H:%M")
+                text += f"• {time}"
+                if feed.get("amount_ml"):
+                    text += f" - {feed['amount_ml']}мл"
+                if feed.get("food_name"):
+                    text += f" ({feed['food_name']})"
+                text += "\n"
+
+        # Прогулки
+        if data.get("walks"):
+            text += "\n🚶 *Прогулки:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for walk in data["walks"]:
+                start_dt = datetime.fromisoformat(walk["start_time"].replace('Z', '+00:00'))
+                start_moscow = start_dt.astimezone(moscow_tz)
+                start = start_moscow.strftime("%H:%M")
+                if walk["end_time"]:
+                    end_dt = datetime.fromisoformat(walk["end_time"].replace('Z', '+00:00'))
+                    end_moscow = end_dt.astimezone(moscow_tz)
+                    end = end_moscow.strftime("%H:%M")
+                    text += f"• {start} - {end}"
+                    if walk.get("location"):
+                        text += f" ({walk['location']})"
+                else:
+                    text += f"• Гуляем с {start} 🌳"
+                text += "\n"
+
+        # Подгузники
+        if data.get("diapers"):
+            text += "\n🚼 *Подгузники:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for diaper in data["diapers"]:
+                time_dt = datetime.fromisoformat(diaper["time"].replace('Z', '+00:00'))
+                time_moscow = time_dt.astimezone(moscow_tz)
+                time = time_moscow.strftime("%H:%M")
+
+                if diaper["type"] == "poop":
+                    emoji = "💩"
+                elif diaper["type"] == "pee":
+                    emoji = "💧"
+                else:
+                    emoji = "🚼"
+
+                text += f"• {time} {emoji}"
+                if diaper.get("consistency"):
+                    text += f" ({diaper['consistency']})"
+                text += "\n"
+
+        # Температура
+        if data.get("temperatures"):
+            text += "\n🌡️ *Температура:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for temp in data["temperatures"]:
+                time_dt = datetime.fromisoformat(temp["time"].replace('Z', '+00:00'))
+                time_moscow = time_dt.astimezone(moscow_tz)
+                time = time_moscow.strftime("%H:%M")
+
+                text += f"• {time} - {temp['temperature']}°C"
+                if temp.get("measurement_type"):
+                    text += f" ({temp['measurement_type']})"
+                text += "\n"
+
+        # Лекарства
+        if data.get("medications"):
+            text += "\n💊 *Лекарства:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            for med in data["medications"]:
+                time_dt = datetime.fromisoformat(med["time"].replace('Z', '+00:00'))
+                time_moscow = time_dt.astimezone(moscow_tz)
+                time = time_moscow.strftime("%H:%M")
+
+                text += f"• {time} - {med['medication_name']}"
+                if med.get("dosage"):
+                    text += f" ({med['dosage']})"
+                text += "\n"
+
+        # Настроение
+        if data.get("moods"):
+            text += "\n😊 *Настроение:*\n"
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            mood_emojis = {
+                "веселое": "😄",
+                "спокойное": "😌",
+                "капризное": "😤",
+                "плачет": "😢",
+                "хорошее": "😊",
+                "плохое": "😔"
+            }
+            for mood_entry in data["moods"]:
+                time_dt = datetime.fromisoformat(mood_entry["time"].replace('Z', '+00:00'))
+                time_moscow = time_dt.astimezone(moscow_tz)
+                time = time_moscow.strftime("%H:%M")
+
+                mood = mood_entry["mood"]
+                emoji = mood_emojis.get(mood.lower(), "😊")
+                text += f"• {time} - {emoji} {mood}"
+                if mood_entry.get("notes"):
+                    text += f" ({mood_entry['notes']})"
+                text += "\n"
+
+        # Проверяем есть ли вообще записи
+        if not any([data.get("sleep"), data.get("feeding"), data.get("walks"),
+                    data.get("diapers"), data.get("temperatures"),
+                    data.get("medications"), data.get("moods")]):
+            text = "Пока нет записей за сегодня. Расскажите, что делает малыш? 😊"
+
+        await message.answer(text, parse_mode="Markdown")
+
     except Exception as e:
         logger.error(f"Error in today_handler: {e}")
         await message.answer("Что-то пошло не так 😔")
-        await message.answer("Сначала добавьте ребенка через /add_child")
-        return
-
-    child_id = user_mapping[telegram_id]["child_id"]
-
-    try:
-        response = requests.get(f"{ACTIVITY_SERVICE_URL}/activities/child/{child_id}/today")
-        if response.status_code == 200:
-            data = response.json()
-
-            text = "📊 *Сегодняшние активности:*\n\n"
-
-            # Сон
-            if data.get("sleep"):
-                text += "😴 *Сон:*\n"
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                for sleep in data["sleep"]:
-                    # Парсим время и конвертируем в московское
-                    start_dt = datetime.fromisoformat(sleep["start_time"].replace('Z', '+00:00'))
-                    start_moscow = start_dt.astimezone(moscow_tz)
-                    start = start_moscow.strftime("%H:%M")
-
-                    if sleep["end_time"]:
-                        end_dt = datetime.fromisoformat(sleep["end_time"].replace('Z', '+00:00'))
-                        end_moscow = end_dt.astimezone(moscow_tz)
-                        end = end_moscow.strftime("%H:%M")
-                        duration = sleep.get("duration_minutes", 0)
-                        hours = duration // 60
-                        minutes = duration % 60
-                        if hours > 0:
-                            duration_str = f"{hours}ч {minutes}мин"
-                        else:
-                            duration_str = f"{minutes} мин"
-                        text += f"• {start} - {end} ({duration_str})\n"
-                    else:
-                        text += f"• Спит с {start}\n"
-
-            # Кормление
-            if data.get("feeding"):
-                text += "\n🍼 *Кормления:*\n"
-                for feed in data["feeding"]:
-                    time = feed["time"].split("T")[1][:5]
-                    text += f"• {time}"
-                    if feed.get("amount_ml"):
-                        text += f" - {feed['amount_ml']}мл"
-                    if feed.get("food_name"):
-                        text += f" ({feed['food_name']})"
-                    text += "\n"
-
-            # Прогулки
-            if data.get("walks"):
-                text += "\n🚶 *Прогулки:*\n"
-                for walk in data["walks"]:
-                    start = walk["start_time"].split("T")[1][:5]
-                    if walk["end_time"]:
-                        end = walk["end_time"].split("T")[1][:5]
-                        text += f"• {start} - {end}"
-                        if walk.get("location"):
-                            text += f" ({walk['location']})"
-                    else:
-                        text += f"• Гуляет с {start}"
-                    text += "\n"
-
-            if not any([data.get("sleep"), data.get("feeding"), data.get("walks")]):
-                text = "Пока нет записей за сегодня"
-
-            await message.answer(text, parse_mode="Markdown")
-        else:
-            await message.answer("Ошибка при получении данных")
-    except Exception as e:
-        logger.error(f"Error in today_handler: {e}")
-        await message.answer("Произошла ошибка")
 
 
 @dp.message(Command("help"))
@@ -397,6 +328,10 @@ async def help_handler(message: Message):
 • покормила грудью
 • выпил 200мл смеси
 • гуляем в парке
+• вчера вечером плохо спал
+• позавчера температура была 37.5
+• покормила через час после сна
+• в обед покакал
 
 Я всегда рядом и помогу! 💕
 """
