@@ -231,7 +231,22 @@ async def today_handler(message: Message):
                         text += f" ({diaper['consistency']})"
                     text += "\n"
 
-            if not any([data.get("sleep"), data.get("feeding"), data.get("walks"), data.get("diapers")]):
+            # Температура
+            if data.get("temperatures"):
+                text += "\n🌡️ *Температура:*\n"
+                moscow_tz = pytz.timezone('Europe/Moscow')
+                for temp in data["temperatures"]:
+                    time_dt = datetime.fromisoformat(temp["time"].replace('Z', '+00:00'))
+                    time_moscow = time_dt.astimezone(moscow_tz)
+                    time = time_moscow.strftime("%H:%M")
+
+                    text += f"• {time} - {temp['temperature']}°C"
+                    if temp.get("measurement_type"):
+                        text += f" ({temp['measurement_type']})"
+                    text += "\n"
+
+            if not any([data.get("sleep"), data.get("feeding"), data.get("walks"), data.get("diapers"),
+                        data.get("temperatures")]):
                 text = "Пока нет записей за сегодня. Расскажите, что делает малыш? 😊"
 
             await message.answer(text, parse_mode="Markdown")
@@ -333,6 +348,7 @@ async def help_handler(message: Message):
 • "гуляем" - отмечу прогулку
 • "покакал" - запишу смену подгузника
 • "пописал" - отмечу мокрый подгузник
+• "температура 37.2" - запишу температуру
 
 *Примеры сообщений:*
 • спит с 14:30

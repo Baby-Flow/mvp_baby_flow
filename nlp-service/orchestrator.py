@@ -20,7 +20,7 @@ from tools import (
 class BabyFlowOrchestrator:
     def __init__(self):
         self.llm = ChatAnthropic(
-            model="claude-3-haiku-20240307",  # Лучшая модель 2024
+            model="claude-3-haiku-20240307",  # Быстрая и экономичная модель
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             temperature=0.3
         )
@@ -70,6 +70,7 @@ class BabyFlowOrchestrator:
         - "покакал", "какал" → database_writer_tool с activity_type="diaper", type="poop"
         - "пописал", "писал" → database_writer_tool с activity_type="diaper", type="pee"
         - "памперс", "подгузник" → database_writer_tool с activity_type="diaper"
+        - "температура 37.5", "36.6" → database_writer_tool с activity_type="temperature", temperature=число
         
         ПРАВИЛА ИСПОЛЬЗОВАНИЯ ИНСТРУМЕНТОВ:
         1. database_writer_tool принимает параметры: activity_type ("sleep"/"feeding"/"walk"), child_id, и время
@@ -92,6 +93,7 @@ class BabyFlowOrchestrator:
         - "🚶 Начали прогулку"
         - "💩 Отметила смену подгузника"
         - "💧 Записала, что малыш пописал"
+        - "🌡️ Записала температуру 37.2°C"
         """.format(current_time=datetime.now(pytz.timezone('Europe/Moscow')).strftime("%Y-%m-%d %H:%M"))
 
     def process_message(self, message: str, child_id: int = 1) -> Dict[str, Any]:

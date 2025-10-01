@@ -4,7 +4,8 @@ from datetime import datetime
 from typing import Optional, List, Union
 from pydantic import BaseModel
 import pytz
-from models import get_db, User, Child, SleepActivity, FeedingActivity, WalkActivity, DiaperActivity, Conversation
+from models import get_db, User, Child, SleepActivity, FeedingActivity, WalkActivity, DiaperActivity, \
+    TemperatureActivity, Conversation
 
 app = FastAPI(title="BabyFlow Activity Service")
 
@@ -47,6 +48,14 @@ class DiaperCreate(BaseModel):
     type: str  # pee, poop, both
     consistency: Optional[str] = None
     color: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TemperatureCreate(BaseModel):
+    child_id: int
+    time: Union[datetime, str]
+    temperature: float
+    measurement_type: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -225,6 +234,22 @@ def create_diaper(diaper: DiaperCreate, db: Session = Depends(get_db)):
     return new_diaper
 
 
+# Temperature endpoints
+@app.post("/activities/temperature/")
+def create_temperature(temp: TemperatureCreate, db: Session = Depends(get_db)):
+    temp_data = temp.dict()
+
+    # Обрабатываем datetime если строка
+    if isinstance(temp_data.get('time'), str):
+        temp_data['time'] = datetime.fromisoformat(temp_data['time'].replace('Z', '+00:00'))
+
+    new_temp = TemperatureActivity(**temp_data)
+    db.add(new_temp)
+    db.commit()
+    db.refresh(new_temp)
+    return new_temp
+
+
 # Get all activities for a child
 @app.get("/activities/child/{child_id}")
 def get_child_activities(child_id: int, db: Session = Depends(get_db)):
@@ -232,12 +257,14 @@ def get_child_activities(child_id: int, db: Session = Depends(get_db)):
     feeding = db.query(FeedingActivity).filter(FeedingActivity.child_id == child_id).all()
     walks = db.query(WalkActivity).filter(WalkActivity.child_id == child_id).all()
     diapers = db.query(DiaperActivity).filter(DiaperActivity.child_id == child_id).all()
+    temperatures = db.query(TemperatureActivity).filter(TemperatureActivity.child_id == child_id).all()
 
     return {
         "sleep": sleep,
         "feeding": feeding,
         "walks": walks,
-        "diapers": diapers
+        "diapers": diapers,
+        "temperatures": temperatures
     }
 
 
@@ -270,9 +297,15 @@ def get_today_activities(child_id: int, db: Session = Depends(get_db)):
         DiaperActivity.time >= today_start
     ).all()
 
+    temperatures = db.query(TemperatureActivity).filter(
+        TemperatureActivity.child_id == child_id,
+        TemperatureActivity.time >= today_start
+    ).all()
+
     return {
         "sleep": sleep,
         "feeding": feeding,
         "walks": walks,
-        "diapers": diapers
+        "diapers": diapers,
+        "temperatures": temperatures
     }

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Date
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Date, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
@@ -101,6 +101,19 @@ class DiaperActivity(Base):
     type = Column(String(50), nullable=False)
     consistency = Column(String(50))
     color = Column(String(50))
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TemperatureActivity(Base):
+    __tablename__ = "temperature_activities"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    time = Column(DateTime(timezone=True), nullable=False)
+    temperature = Column(Numeric(3, 1), nullable=False)
+    measurement_type = Column(String(50))
     notes = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
