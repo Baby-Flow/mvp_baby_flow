@@ -83,6 +83,20 @@ CREATE TABLE IF NOT EXISTS walk_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Активности: Подгузники
+CREATE TABLE IF NOT EXISTS diaper_activities (
+    id SERIAL PRIMARY KEY,
+    child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id),
+    time TIMESTAMP WITH TIME ZONE NOT NULL,
+    type VARCHAR(50) NOT NULL, -- pee, poop, both
+    consistency VARCHAR(50), -- для стула: жидкий, нормальный, твердый
+    color VARCHAR(50), -- цвет
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Группы (для семейных чатов)
 CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,
@@ -114,6 +128,9 @@ CREATE INDEX idx_feeding_time ON feeding_activities(time);
 CREATE INDEX idx_walk_child_id ON walk_activities(child_id);
 CREATE INDEX idx_walk_start_time ON walk_activities(start_time);
 
+CREATE INDEX idx_diaper_child_id ON diaper_activities(child_id);
+CREATE INDEX idx_diaper_time ON diaper_activities(time);
+
 -- Функция для автообновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -137,4 +154,7 @@ CREATE TRIGGER update_feeding_updated_at BEFORE UPDATE ON feeding_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_walk_updated_at BEFORE UPDATE ON walk_activities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_diaper_updated_at BEFORE UPDATE ON diaper_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

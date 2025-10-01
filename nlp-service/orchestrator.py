@@ -67,6 +67,9 @@ class BabyFlowOrchestrator:
         - "проснулся", "встал" → сначала database_reader_tool найти открытый сон, потом end_sleep_tool БЕЗ указания времени
         - "покушал", "поел", "покормила" → database_writer_tool с activity_type="feeding"
         - "гуляем", "на прогулке" → database_writer_tool с activity_type="walk"
+        - "покакал", "какал" → database_writer_tool с activity_type="diaper", type="poop"
+        - "пописал", "писал" → database_writer_tool с activity_type="diaper", type="pee"
+        - "памперс", "подгузник" → database_writer_tool с activity_type="diaper"
         
         ПРАВИЛА ИСПОЛЬЗОВАНИЯ ИНСТРУМЕНТОВ:
         1. database_writer_tool принимает параметры: activity_type ("sleep"/"feeding"/"walk"), child_id, и время
@@ -87,6 +90,8 @@ class BabyFlowOrchestrator:
         - "✅ Малыш проснулся! Спал 2 часа 15 минут"
         - "📝 Записала кормление"
         - "🚶 Начали прогулку"
+        - "💩 Отметила смену подгузника"
+        - "💧 Записала, что малыш пописал"
         """.format(current_time=datetime.now(pytz.timezone('Europe/Moscow')).strftime("%Y-%m-%d %H:%M"))
 
     def process_message(self, message: str, child_id: int = 1) -> Dict[str, Any]:

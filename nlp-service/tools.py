@@ -34,7 +34,7 @@ def database_reader_tool(child_id: int, activity_type: str = "all") -> Dict:
 def database_writer_tool(activity_type: str, data: Dict) -> Dict:
     """
     Записывает активность в БД
-    activity_type: "sleep", "feeding", "walk"
+    activity_type: "sleep", "feeding", "walk", "diaper"
     data: словарь с данными (обязательно должен содержать child_id)
     """
     try:
@@ -60,6 +60,18 @@ def database_writer_tool(activity_type: str, data: Dict) -> Dict:
             if 'start_time' not in data:
                 data['start_time'] = current_time
             response = requests.post(f"{ACTIVITY_SERVICE_URL}/activities/walk/", json=data)
+        elif "diaper" in activity_type.lower() or "подгуз" in activity_type.lower() or "пописал" in activity_type.lower() or "покакал" in activity_type.lower():
+            if 'time' not in data:
+                data['time'] = current_time
+            if 'type' not in data:
+                # Определяем тип по activity_type
+                if "покакал" in activity_type.lower() or "poop" in activity_type.lower():
+                    data['type'] = 'poop'
+                elif "пописал" in activity_type.lower() or "pee" in activity_type.lower():
+                    data['type'] = 'pee'
+                else:
+                    data['type'] = 'both'
+            response = requests.post(f"{ACTIVITY_SERVICE_URL}/activities/diaper/", json=data)
         else:
             return {"error": f"Unknown activity type: {activity_type}"}
 

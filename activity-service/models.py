@@ -91,6 +91,20 @@ class WalkActivity(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class DiaperActivity(Base):
+    __tablename__ = "diaper_activities"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    time = Column(DateTime(timezone=True), nullable=False)
+    type = Column(String(50), nullable=False)
+    consistency = Column(String(50))
+    color = Column(String(50))
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 def get_db():
     db = SessionLocal()
     try:
