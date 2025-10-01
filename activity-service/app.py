@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 from pydantic import BaseModel
 import pytz
 from models import get_db, User, Child, SleepActivity, FeedingActivity, WalkActivity, DiaperActivity, \
-    TemperatureActivity, Conversation
+    TemperatureActivity, MedicationActivity, Conversation
 
 app = FastAPI(title="BabyFlow Activity Service")
 
@@ -56,6 +56,14 @@ class TemperatureCreate(BaseModel):
     time: Union[datetime, str]
     temperature: float
     measurement_type: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MedicationCreate(BaseModel):
+    child_id: int
+    time: Union[datetime, str]
+    medication_name: str
+    dosage: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -250,6 +258,22 @@ def create_temperature(temp: TemperatureCreate, db: Session = Depends(get_db)):
     return new_temp
 
 
+# Medication endpoints
+@app.post("/activities/medication/")
+def create_medication(med: MedicationCreate, db: Session = Depends(get_db)):
+    med_data = med.dict()
+
+    # Обрабатываем datetime если строка
+    if isinstance(med_data.get('time'), str):
+        med_data['time'] = datetime.fromisoformat(med_data['time'].replace('Z', '+00:00'))
+
+    new_med = MedicationActivity(**med_data)
+    db.add(new_med)
+    db.commit()
+    db.refresh(new_med)
+    return new_med
+
+
 # Get all activities for a child
 @app.get("/activities/child/{child_id}")
 def get_child_activities(child_id: int, db: Session = Depends(get_db)):
@@ -258,13 +282,15 @@ def get_child_activities(child_id: int, db: Session = Depends(get_db)):
     walks = db.query(WalkActivity).filter(WalkActivity.child_id == child_id).all()
     diapers = db.query(DiaperActivity).filter(DiaperActivity.child_id == child_id).all()
     temperatures = db.query(TemperatureActivity).filter(TemperatureActivity.child_id == child_id).all()
+    medications = db.query(MedicationActivity).filter(MedicationActivity.child_id == child_id).all()
 
     return {
         "sleep": sleep,
         "feeding": feeding,
         "walks": walks,
         "diapers": diapers,
-        "temperatures": temperatures
+        "temperatures": temperatures,
+        "medications": medications
     }
 
 
@@ -302,10 +328,16 @@ def get_today_activities(child_id: int, db: Session = Depends(get_db)):
         TemperatureActivity.time >= today_start
     ).all()
 
+    medications = db.query(MedicationActivity).filter(
+        MedicationActivity.child_id == child_id,
+        MedicationActivity.time >= today_start
+    ).all()
+
     return {
         "sleep": sleep,
         "feeding": feeding,
         "walks": walks,
         "diapers": diapers,
-        "temperatures": temperatures
+        "temperatures": temperatures,
+        "medications": medications
     }

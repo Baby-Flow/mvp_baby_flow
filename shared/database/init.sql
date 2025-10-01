@@ -110,6 +110,19 @@ CREATE TABLE IF NOT EXISTS temperature_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Активности: Лекарства
+CREATE TABLE IF NOT EXISTS medication_activities (
+    id SERIAL PRIMARY KEY,
+    child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id),
+    time TIMESTAMP WITH TIME ZONE NOT NULL,
+    medication_name VARCHAR(255) NOT NULL,
+    dosage VARCHAR(100), -- 5мл, 1 таблетка, 2 капли
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Группы (для семейных чатов)
 CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,
@@ -147,6 +160,9 @@ CREATE INDEX idx_diaper_time ON diaper_activities(time);
 CREATE INDEX idx_temperature_child_id ON temperature_activities(child_id);
 CREATE INDEX idx_temperature_time ON temperature_activities(time);
 
+CREATE INDEX idx_medication_child_id ON medication_activities(child_id);
+CREATE INDEX idx_medication_time ON medication_activities(time);
+
 -- Функция для автообновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -176,4 +192,7 @@ CREATE TRIGGER update_diaper_updated_at BEFORE UPDATE ON diaper_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_temperature_updated_at BEFORE UPDATE ON temperature_activities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_medication_updated_at BEFORE UPDATE ON medication_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

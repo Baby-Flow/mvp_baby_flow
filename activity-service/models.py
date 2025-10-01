@@ -118,6 +118,19 @@ class TemperatureActivity(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class MedicationActivity(Base):
+    __tablename__ = "medication_activities"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    time = Column(DateTime(timezone=True), nullable=False)
+    medication_name = Column(String(255), nullable=False)
+    dosage = Column(String(100))
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 def get_db():
     db = SessionLocal()
     try:
