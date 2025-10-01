@@ -131,6 +131,19 @@ class MedicationActivity(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class MoodActivity(Base):
+    __tablename__ = "mood_activities"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    time = Column(DateTime(timezone=True), nullable=False)
+    mood = Column(String(50), nullable=False)
+    intensity = Column(Integer)
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 def get_db():
     db = SessionLocal()
     try:

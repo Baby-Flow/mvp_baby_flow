@@ -259,8 +259,33 @@ async def today_handler(message: Message):
                         text += f" ({med['dosage']})"
                     text += "\n"
 
-            if not any([data.get("sleep"), data.get("feeding"), data.get("walks"), data.get("diapers"),
-                        data.get("temperatures"), data.get("medications")]):
+            # Настроение
+            if data.get("moods"):
+                text += "\n😊 *Настроение:*\n"
+                moscow_tz = pytz.timezone('Europe/Moscow')
+                mood_emojis = {
+                    "веселое": "😄",
+                    "спокойное": "😌",
+                    "капризное": "😤",
+                    "плачет": "😢",
+                    "хорошее": "😊",
+                    "плохое": "😔"
+                }
+                for mood_entry in data["moods"]:
+                    time_dt = datetime.fromisoformat(mood_entry["time"].replace('Z', '+00:00'))
+                    time_moscow = time_dt.astimezone(moscow_tz)
+                    time = time_moscow.strftime("%H:%M")
+
+                    mood = mood_entry["mood"]
+                    emoji = mood_emojis.get(mood.lower(), "😊")
+                    text += f"• {time} - {emoji} {mood}"
+                    if mood_entry.get("notes"):
+                        text += f" ({mood_entry['notes']})"
+                    text += "\n"
+
+            if not any([data.get("sleep"), data.get("feeding"), data.get("walks"),
+                        data.get("diapers"), data.get("temperatures"),
+                        data.get("medications"), data.get("moods")]):
                 text = "Пока нет записей за сегодня. Расскажите, что делает малыш? 😊"
 
             await message.answer(text, parse_mode="Markdown")
@@ -364,6 +389,7 @@ async def help_handler(message: Message):
 • "пописал" - отмечу мокрый подгузник
 • "температура 37.2" - запишу температуру
 • "дали нурофен 5мл" - запишу лекарство
+• "веселый" или "капризничает" - отмечу настроение
 
 *Примеры сообщений:*
 • спит с 14:30

@@ -123,6 +123,19 @@ CREATE TABLE IF NOT EXISTS medication_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Активности: Настроение
+CREATE TABLE IF NOT EXISTS mood_activities (
+    id SERIAL PRIMARY KEY,
+    child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id),
+    time TIMESTAMP WITH TIME ZONE NOT NULL,
+    mood VARCHAR(50) NOT NULL, -- веселое, спокойное, капризное, плачет
+    intensity INTEGER, -- 1-5 шкала интенсивности
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Группы (для семейных чатов)
 CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,
@@ -163,6 +176,9 @@ CREATE INDEX idx_temperature_time ON temperature_activities(time);
 CREATE INDEX idx_medication_child_id ON medication_activities(child_id);
 CREATE INDEX idx_medication_time ON medication_activities(time);
 
+CREATE INDEX idx_mood_child_id ON mood_activities(child_id);
+CREATE INDEX idx_mood_time ON mood_activities(time);
+
 -- Функция для автообновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -195,4 +211,7 @@ CREATE TRIGGER update_temperature_updated_at BEFORE UPDATE ON temperature_activi
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_medication_updated_at BEFORE UPDATE ON medication_activities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_mood_updated_at BEFORE UPDATE ON mood_activities
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

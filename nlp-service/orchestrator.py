@@ -72,6 +72,7 @@ class BabyFlowOrchestrator:
         - "памперс", "подгузник" → database_writer_tool с activity_type="diaper"
         - "температура 37.5", "36.6" → database_writer_tool с activity_type="temperature", temperature=число
         - "дали нурофен", "выпил лекарство" → database_writer_tool с activity_type="medication", medication_name и dosage
+        - "веселый", "капризный", "плачет" → database_writer_tool с activity_type="mood", mood=настроение
         
         ПРАВИЛА ИСПОЛЬЗОВАНИЯ ИНСТРУМЕНТОВ:
         1. database_writer_tool принимает параметры: activity_type ("sleep"/"feeding"/"walk"), child_id, и время
@@ -96,6 +97,8 @@ class BabyFlowOrchestrator:
         - "💧 Записала, что малыш пописал"
         - "🌡️ Записала температуру 37.2°C"
         - "💊 Записала лекарство: Нурофен 5мл"
+        - "😊 Отметила настроение: веселое"
+        - "😢 Записала, что малыш капризничает"
         """.format(current_time=datetime.now(pytz.timezone('Europe/Moscow')).strftime("%Y-%m-%d %H:%M"))
 
     def process_message(self, message: str, child_id: int = 1) -> Dict[str, Any]:

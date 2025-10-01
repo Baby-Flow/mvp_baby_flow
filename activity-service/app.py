@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 from pydantic import BaseModel
 import pytz
 from models import get_db, User, Child, SleepActivity, FeedingActivity, WalkActivity, DiaperActivity, \
-    TemperatureActivity, MedicationActivity, Conversation
+    TemperatureActivity, MedicationActivity, MoodActivity, Conversation
 
 app = FastAPI(title="BabyFlow Activity Service")
 
@@ -64,6 +64,14 @@ class MedicationCreate(BaseModel):
     time: Union[datetime, str]
     medication_name: str
     dosage: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MoodCreate(BaseModel):
+    child_id: int
+    time: Union[datetime, str]
+    mood: str
+    intensity: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -274,6 +282,22 @@ def create_medication(med: MedicationCreate, db: Session = Depends(get_db)):
     return new_med
 
 
+# Mood endpoints
+@app.post("/activities/mood/")
+def create_mood(mood: MoodCreate, db: Session = Depends(get_db)):
+    mood_data = mood.dict()
+
+    # Обрабатываем datetime если строка
+    if isinstance(mood_data.get('time'), str):
+        mood_data['time'] = datetime.fromisoformat(mood_data['time'].replace('Z', '+00:00'))
+
+    new_mood = MoodActivity(**mood_data)
+    db.add(new_mood)
+    db.commit()
+    db.refresh(new_mood)
+    return new_mood
+
+
 # Get all activities for a child
 @app.get("/activities/child/{child_id}")
 def get_child_activities(child_id: int, db: Session = Depends(get_db)):
@@ -283,6 +307,7 @@ def get_child_activities(child_id: int, db: Session = Depends(get_db)):
     diapers = db.query(DiaperActivity).filter(DiaperActivity.child_id == child_id).all()
     temperatures = db.query(TemperatureActivity).filter(TemperatureActivity.child_id == child_id).all()
     medications = db.query(MedicationActivity).filter(MedicationActivity.child_id == child_id).all()
+    moods = db.query(MoodActivity).filter(MoodActivity.child_id == child_id).all()
 
     return {
         "sleep": sleep,
@@ -290,7 +315,8 @@ def get_child_activities(child_id: int, db: Session = Depends(get_db)):
         "walks": walks,
         "diapers": diapers,
         "temperatures": temperatures,
-        "medications": medications
+        "medications": medications,
+        "moods": moods
     }
 
 
@@ -333,11 +359,17 @@ def get_today_activities(child_id: int, db: Session = Depends(get_db)):
         MedicationActivity.time >= today_start
     ).all()
 
+    moods = db.query(MoodActivity).filter(
+        MoodActivity.child_id == child_id,
+        MoodActivity.time >= today_start
+    ).all()
+
     return {
         "sleep": sleep,
         "feeding": feeding,
         "walks": walks,
         "diapers": diapers,
         "temperatures": temperatures,
-        "medications": medications
+        "medications": medications,
+        "moods": moods
     }
