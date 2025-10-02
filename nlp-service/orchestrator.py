@@ -3,7 +3,6 @@ Orchestrator с динамическим reasoning для мультиагент
 """
 import os
 from typing import Dict, Any
-from langchain_anthropic import ChatAnthropic
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from datetime import datetime
@@ -20,11 +19,29 @@ from tools import (
 
 class BabyFlowOrchestrator:
     def __init__(self):
-        self.llm = ChatAnthropic(
-            model="claude-3-haiku-20240307",  # Быстрая и экономичная модель
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            temperature=0.3
-        )
+        # Выбор LLM провайдера через переменные окружения
+        llm_provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+
+        if llm_provider == "mistral":
+            from langchain_mistralai import ChatMistralAI
+            self.llm = ChatMistralAI(
+                model=os.getenv("MISTRAL_MODEL", "mistral-large-latest"),  # Лучшая модель Mistral
+                mistral_api_key=os.getenv("MISTRAL_API_KEY"),
+                temperature=0.3,
+                max_retries=2,
+                safe_mode=False  # Отключаем safe mode для tool calling
+            )
+            print(f"✅ Using Mistral AI: {os.getenv('MISTRAL_MODEL', 'mistral-large-latest')}")
+        elif llm_provider == "anthropic":
+            from langchain_anthropic import ChatAnthropic
+            self.llm = ChatAnthropic(
+                model=os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307"),
+                anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+                temperature=0.3
+            )
+            print(f"✅ Using Anthropic Claude: {os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')}")
+        else:
+            raise ValueError(f"Unsupported LLM provider: {llm_provider}. Use 'anthropic' or 'mistral'")
 
         self.tools = [
             database_reader_tool,
@@ -40,14 +57,21 @@ class BabyFlowOrchestrator:
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
-        agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
+        # Создаем агента с учетом провайдера
+        if llm_provider == "mistral":
+            # Привязываем tools к модели для Mistral
+            self.llm_with_tools = self.llm.bind_tools(self.tools)
+            agent = create_tool_calling_agent(self.llm_with_tools, self.tools, self.prompt)
+        else:
+            agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
 
         self.executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
             verbose=False,
             max_iterations=5,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            return_intermediate_steps=False
         )
 
     def _get_system_prompt(self) -> str:

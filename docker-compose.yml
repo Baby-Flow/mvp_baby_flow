@@ -41,7 +41,15 @@ services:
     ports:
       - "8002:8002"
     environment:
+      # LLM Provider Selection
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      # Anthropic
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+      # Mistral
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      MISTRAL_MODEL: ${MISTRAL_MODEL}
+      # Service URLs
       ACTIVITY_SERVICE_URL: http://activity-service:8003
     networks:
       - babyflow-network
