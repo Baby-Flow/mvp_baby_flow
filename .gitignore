@@ -10,6 +10,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+nul
 
 # Environment variables
 .env
