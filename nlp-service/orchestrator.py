@@ -48,7 +48,8 @@ class BabyFlowOrchestrator:
             database_writer_tool,
             end_sleep_tool,
             time_calculator_tool,
-            activity_validator_tool
+            activity_validator_tool,
+            relative_time_tool
         ]
 
         self.prompt = ChatPromptTemplate.from_messages([

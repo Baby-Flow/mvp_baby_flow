@@ -4,8 +4,16 @@ from datetime import datetime
 from typing import Optional, List, Union
 from pydantic import BaseModel
 import pytz
+import logging
 from models import get_db, User, Child, SleepActivity, FeedingActivity, WalkActivity, DiaperActivity, \
     TemperatureActivity, MedicationActivity, MoodActivity, Conversation
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BabyFlow Activity Service")
 
@@ -96,14 +104,17 @@ def root():
 # User endpoints
 @app.post("/users/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    logger.info(f"Creating user with telegram_id={user.telegram_id}")
     db_user = db.query(User).filter(User.telegram_id == user.telegram_id).first()
     if db_user:
+        logger.info(f"User with telegram_id={user.telegram_id} already exists")
         return db_user
 
     new_user = User(**user.dict())
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    logger.info(f"Successfully created user id={new_user.id}, telegram_id={new_user.telegram_id}")
     return new_user
 
 
@@ -118,6 +129,7 @@ def get_user_by_telegram(telegram_id: int, db: Session = Depends(get_db)):
 # Child endpoints
 @app.post("/children/")
 def create_child(child: ChildCreate, db: Session = Depends(get_db)):
+    logger.info(f"Creating child: name={child.name}, user_id={child.user_id}")
     new_child = Child(
         user_id=child.user_id,
         name=child.name,
@@ -127,6 +139,7 @@ def create_child(child: ChildCreate, db: Session = Depends(get_db)):
     db.add(new_child)
     db.commit()
     db.refresh(new_child)
+    logger.info(f"Successfully created child id={new_child.id}, name={new_child.name}")
     return new_child
 
 
@@ -139,6 +152,7 @@ def get_children_by_user(user_id: int, db: Session = Depends(get_db)):
 # Sleep endpoints
 @app.post("/activities/sleep/")
 def create_sleep(sleep: SleepCreate, db: Session = Depends(get_db)):
+    logger.info(f"Creating sleep activity for child_id={sleep.child_id}")
     # Если есть end_time, вычисляем duration
     if sleep.end_time and sleep.start_time:
         duration = int((sleep.end_time - sleep.start_time).total_seconds() / 60)
@@ -157,6 +171,7 @@ def create_sleep(sleep: SleepCreate, db: Session = Depends(get_db)):
     db.add(new_sleep)
     db.commit()
     db.refresh(new_sleep)
+    logger.info(f"Created sleep activity id={new_sleep.id} for child_id={new_sleep.child_id}")
     return new_sleep
 
 
@@ -171,8 +186,10 @@ def get_open_sleep(child_id: int, db: Session = Depends(get_db)):
 
 @app.put("/activities/sleep/{sleep_id}/end")
 def end_sleep(sleep_id: int, end_time: str, db: Session = Depends(get_db)):
+    logger.info(f"Ending sleep activity id={sleep_id}")
     sleep = db.query(SleepActivity).filter(SleepActivity.id == sleep_id).first()
     if not sleep:
+        logger.warning(f"Sleep activity id={sleep_id} not found")
         raise HTTPException(status_code=404, detail="Sleep not found")
 
     # Парсим строку времени в datetime
@@ -193,12 +210,14 @@ def end_sleep(sleep_id: int, end_time: str, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(sleep)
+    logger.info(f"Ended sleep activity id={sleep_id}, duration={duration} minutes")
     return sleep
 
 
 # Feeding endpoints
 @app.post("/activities/feeding/")
 def create_feeding(feeding: FeedingCreate, db: Session = Depends(get_db)):
+    logger.info(f"Creating feeding activity for child_id={feeding.child_id}, type={feeding.type}")
     feeding_data = feeding.dict()
 
     # Обрабатываем datetime если строка
@@ -209,6 +228,7 @@ def create_feeding(feeding: FeedingCreate, db: Session = Depends(get_db)):
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
+    logger.info(f"Created feeding activity id={new_feeding.id} for child_id={new_feeding.child_id}")
     return new_feeding
 
 

@@ -5,11 +5,19 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import os
+import logging
 from dotenv import load_dotenv
 
 from orchestrator import BabyFlowOrchestrator
 
 load_dotenv()
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BabyFlow NLP Service")
 
@@ -37,13 +45,16 @@ def process_message(request: MessageRequest):
     """
     Обрабатывает сообщение от пользователя через мультиагентную систему
     """
+    logger.info(f"Processing message from child_id={request.child_id}: {request.message}")
     try:
         result = orchestrator.process_message(
             message=request.message,
             child_id=request.child_id
         )
+        logger.info(f"Successfully processed message: {result.get('response', '')}")
         return MessageResponse(**result)
     except Exception as e:
+        logger.error(f"Error processing message: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
